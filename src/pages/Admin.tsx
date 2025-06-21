@@ -28,7 +28,7 @@ const Admin = () => {
         .from('orders')
         .select(`
           *,
-          profiles (
+          profiles!orders_user_id_fkey (
             full_name,
             email
           )
@@ -53,7 +53,7 @@ const Admin = () => {
             service_type,
             package_name
           ),
-          profiles (
+          profiles!payments_user_id_fkey (
             full_name,
             email
           )
