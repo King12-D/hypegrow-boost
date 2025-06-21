@@ -1,17 +1,77 @@
 
-import React, { useState } from 'react';
-import { CreditCard, Smartphone, Copy, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useCreatePayment } from '@/hooks/usePayments';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { CreditCard, Smartphone, Copy, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import PaymentProofUpload from '@/components/PaymentProofUpload';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 const Payment = () => {
-  const [selectedMethod, setSelectedMethod] = useState('bank');
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get('orderId');
+  const [selectedMethod, setSelectedMethod] = useState('bank_transfer');
+  const [bankReference, setBankReference] = useState('');
   const [copied, setCopied] = useState('');
+  const [paymentCreated, setPaymentCreated] = useState(false);
+  const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
+
+  const createPayment = useCreatePayment();
+
+  // Fetch order details
+  const { data: order, isLoading: orderLoading } = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: async () => {
+      if (!orderId) throw new Error('Order ID is required');
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orderId,
+  });
+
+  // Check if payment already exists for this order
+  const { data: existingPayment } = useQuery({
+    queryKey: ['payment', orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orderId,
+  });
+
+  useEffect(() => {
+    if (existingPayment) {
+      setPaymentCreated(true);
+      setCurrentPaymentId(existingPayment.id);
+    }
+  }, [existingPayment]);
 
   const bankDetails = {
     bank: 'First Bank of Nigeria',
-    accountNumber: '1234567890',
-    accountName: 'HypeGrow Solutions',
-    amount: '₦3,500'
+    accountNumber: '3034567890',
+    accountName: 'HypeGrow Solutions Limited',
+    amount: order ? `₦${order.amount.toLocaleString()}` : '₦0'
   };
 
   const copyToClipboard = (text: string, type: string) => {
@@ -20,17 +80,46 @@ const Payment = () => {
     setTimeout(() => setCopied(''), 2000);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPaymentProof(e.target.files[0]);
+  const handleCreatePayment = async () => {
+    if (!order) return;
+
+    try {
+      const payment = await createPayment.mutateAsync({
+        orderId: order.id,
+        amount: order.amount,
+        paymentMethod: selectedMethod,
+        bankReference: bankReference || undefined,
+      });
+      
+      setCurrentPaymentId(payment.id);
+      setPaymentCreated(true);
+    } catch (error) {
+      console.error('Payment creation failed:', error);
     }
   };
 
-  const handleSubmitProof = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Payment proof submitted:', paymentProof);
-    // Handle payment proof submission
-  };
+  if (orderLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Loading payment details..." />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Order Not Found</CardTitle>
+            <CardDescription>
+              The order you're trying to pay for could not be found.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -42,33 +131,37 @@ const Payment = () => {
             </span>
           </h1>
           <p className="text-xl text-gray-600">
-            Choose your preferred payment method to complete your order
+            Secure your order with our trusted payment methods
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Payment Methods */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Payment Methods</h2>
-              
-              {/* Bank Transfer */}
-              <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Methods</CardTitle>
+                <CardDescription>
+                  Choose your preferred payment method
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Bank Transfer */}
                 <div 
                   className={`border-2 rounded-xl p-6 cursor-pointer transition-all duration-300 ${
-                    selectedMethod === 'bank' 
+                    selectedMethod === 'bank_transfer' 
                       ? 'border-purple-500 bg-purple-50' 
                       : 'border-gray-200 hover:border-purple-300'
                   }`}
-                  onClick={() => setSelectedMethod('bank')}
+                  onClick={() => setSelectedMethod('bank_transfer')}
                 >
                   <div className="flex items-center">
                     <input
                       type="radio"
                       name="payment"
-                      value="bank"
-                      checked={selectedMethod === 'bank'}
-                      onChange={() => setSelectedMethod('bank')}
+                      value="bank_transfer"
+                      checked={selectedMethod === 'bank_transfer'}
+                      onChange={() => setSelectedMethod('bank_transfer')}
                       className="mr-3"
                     />
                     <CreditCard className="w-6 h-6 text-purple-600 mr-3" />
@@ -77,92 +170,77 @@ const Payment = () => {
                       <p className="text-gray-600">Transfer directly to our bank account</p>
                     </div>
                   </div>
+
+                  {selectedMethod === 'bank_transfer' && (
+                    <div className="mt-6">
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6">
+                        <h4 className="font-semibold text-gray-900 mb-4">Bank Account Details</h4>
+                        <div className="space-y-3">
+                          {Object.entries(bankDetails).map(([key, value]) => (
+                            <div key={key} className="flex justify-between items-center p-3 bg-white rounded-lg">
+                              <div>
+                                <span className="text-gray-600 capitalize">
+                                  {key === 'accountNumber' ? 'Account Number' : 
+                                   key === 'accountName' ? 'Account Name' : 
+                                   key}:
+                                </span>
+                                <p className="font-semibold">{value}</p>
+                              </div>
+                              <button
+                                onClick={() => copyToClipboard(value, key)}
+                                className="text-purple-600 hover:text-purple-700 flex items-center"
+                              >
+                                {copied === key ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-4">
+                          <Label htmlFor="bank-reference">Bank Reference (Optional)</Label>
+                          <Input
+                            id="bank-reference"
+                            placeholder="Enter transaction reference or note"
+                            value={bankReference}
+                            onChange={(e) => setBankReference(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                          <div className="flex items-start">
+                            <AlertCircle className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
+                            <div className="text-sm text-blue-800">
+                              <p className="font-semibold mb-1">Payment Instructions:</p>
+                              <ul className="list-disc list-inside space-y-1">
+                                <li>Transfer the exact amount to the account above</li>
+                                <li>Take a screenshot of your payment receipt</li>
+                                <li>Upload the receipt using the form below</li>
+                                <li>We'll verify payment within 30 minutes</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {selectedMethod === 'bank' && (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mt-4">
-                    <h4 className="font-semibold text-gray-900 mb-4">Bank Account Details</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                        <div>
-                          <span className="text-gray-600">Bank Name:</span>
-                          <p className="font-semibold">{bankDetails.bank}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                        <div>
-                          <span className="text-gray-600">Account Number:</span>
-                          <p className="font-semibold">{bankDetails.accountNumber}</p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(bankDetails.accountNumber, 'account')}
-                          className="text-purple-600 hover:text-purple-700 flex items-center"
-                        >
-                          {copied === 'account' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      
-                      <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                        <div>
-                          <span className="text-gray-600">Account Name:</span>
-                          <p className="font-semibold">{bankDetails.accountName}</p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(bankDetails.accountName, 'name')}
-                          className="text-purple-600 hover:text-purple-700 flex items-center"
-                        >
-                          {copied === 'name' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      
-                      <div className="flex justify-between items-center p-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg">
-                        <div>
-                          <span className="opacity-90">Amount to Pay:</span>
-                          <p className="font-bold text-xl">{bankDetails.amount}</p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(bankDetails.amount, 'amount')}
-                          className="text-white hover:text-gray-200 flex items-center"
-                        >
-                          {copied === 'amount' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-start">
-                        <AlertCircle className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
-                        <div className="text-sm text-blue-800">
-                          <p className="font-semibold mb-1">Payment Instructions:</p>
-                          <ul className="list-disc list-inside space-y-1">
-                            <li>Transfer the exact amount to the account above</li>
-                            <li>Take a screenshot of your payment receipt</li>
-                            <li>Upload the receipt using the form below</li>
-                            <li>We'll verify payment within 30 minutes</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Mobile Money Option */}
+                {/* Mobile Money */}
                 <div 
                   className={`border-2 rounded-xl p-6 cursor-pointer transition-all duration-300 ${
-                    selectedMethod === 'mobile' 
+                    selectedMethod === 'mobile_money' 
                       ? 'border-purple-500 bg-purple-50' 
                       : 'border-gray-200 hover:border-purple-300'
                   }`}
-                  onClick={() => setSelectedMethod('mobile')}
+                  onClick={() => setSelectedMethod('mobile_money')}
                 >
                   <div className="flex items-center">
                     <input
                       type="radio"
                       name="payment"
-                      value="mobile"
-                      checked={selectedMethod === 'mobile'}
-                      onChange={() => setSelectedMethod('mobile')}
+                      value="mobile_money"
+                      checked={selectedMethod === 'mobile_money'}
+                      onChange={() => setSelectedMethod('mobile_money')}
                       className="mr-3"
                     />
                     <Smartphone className="w-6 h-6 text-purple-600 mr-3" />
@@ -171,104 +249,106 @@ const Payment = () => {
                       <p className="text-gray-600">Pay with Opay, PalmPay, Kuda (Coming Soon)</p>
                     </div>
                   </div>
+
+                  {selectedMethod === 'mobile_money' && (
+                    <div className="mt-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6">
+                      <div className="text-center">
+                        <AlertCircle className="w-12 h-12 text-purple-600 mx-auto mb-4" />
+                        <h4 className="font-semibold text-gray-900 mb-2">Coming Soon</h4>
+                        <p className="text-gray-600">
+                          Mobile money integration is coming soon. For now, please use bank transfer.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {selectedMethod === 'mobile' && (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mt-4">
-                    <div className="text-center">
-                      <AlertCircle className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-                      <h4 className="font-semibold text-gray-900 mb-2">Coming Soon</h4>
-                      <p className="text-gray-600">
-                        Mobile money integration is coming soon. For now, please use bank transfer.
-                      </p>
-                    </div>
+                {/* Create Payment Button */}
+                {!paymentCreated && (
+                  <div className="pt-4">
+                    <Button
+                      onClick={handleCreatePayment}
+                      disabled={createPayment.isPending || selectedMethod === 'mobile_money'}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {createPayment.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <CreditCard className="w-4 h-4 mr-2" />
+                      )}
+                      Create Payment Record
+                    </Button>
                   </div>
                 )}
-              </div>
 
-              {/* Payment Proof Upload */}
-              {selectedMethod === 'bank' && (
-                <div className="mt-8">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Upload Payment Proof</h3>
-                  <form onSubmit={handleSubmitProof} className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-purple-400 transition-colors">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="payment-proof"
-                      />
-                      <label htmlFor="payment-proof" className="cursor-pointer">
-                        <div className="space-y-2">
-                          <div className="mx-auto w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                            <CreditCard className="w-6 h-6 text-purple-600" />
-                          </div>
-                          <p className="text-gray-600">
-                            {paymentProof ? paymentProof.name : 'Click to upload payment receipt'}
-                          </p>
-                          <p className="text-sm text-gray-500">PNG, JPG up to 10MB</p>
-                        </div>
-                      </label>
-                    </div>
-                    
-                    {paymentProof && (
-                      <button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:shadow-lg transition-all duration-300"
-                      >
-                        Submit Payment Proof
-                      </button>
-                    )}
-                  </form>
-                </div>
-              )}
-            </div>
+                {/* Payment Proof Upload */}
+                {paymentCreated && currentPaymentId && (
+                  <div className="pt-4">
+                    <PaymentProofUpload paymentId={currentPaymentId} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-xl p-6 sticky top-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
-              
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Platform:</span>
-                  <span className="font-semibold">Instagram</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Service:</span>
-                  <span className="font-semibold">Followers</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Quantity:</span>
-                  <span className="font-semibold">1,000</span>
-                </div>
-                <div className="border-t pt-3 mt-3">
-                  <div className="flex justify-between text-lg">
-                    <span className="font-semibold">Total:</span>
-                    <span className="font-bold text-purple-600">₦3,500</span>
+            <Card className="sticky top-8">
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Platform:</span>
+                    <span className="font-semibold">{order.platform}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Service:</span>
+                    <span className="font-semibold">{order.service_type}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Package:</span>
+                    <span className="font-semibold">{order.package_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Quantity:</span>
+                    <span className="font-semibold">{order.quantity.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Username:</span>
+                    <span className="font-semibold">@{order.username}</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-green-50 rounded-lg p-4 mb-6">
-                <div className="flex items-center">
-                  <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                  <span className="text-green-800 font-semibold">Secure Payment</span>
+                <Separator />
+
+                <div className="flex justify-between text-lg">
+                  <span className="font-semibold">Total:</span>
+                  <span className="font-bold text-purple-600">
+                    ₦{order.amount.toLocaleString()}
+                  </span>
                 </div>
-                <p className="text-green-700 text-sm mt-1">
-                  Your payment is protected and encrypted
-                </p>
-              </div>
 
-              <div className="text-sm text-gray-600 space-y-2">
-                <p>✓ 24-hour delivery start</p>
-                <p>✓ 30-day retention guarantee</p>
-                <p>✓ 24/7 customer support</p>
-                <p>✓ Money-back guarantee</p>
-              </div>
-            </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                    <span className="text-green-800 font-semibold">Secure Payment</span>
+                  </div>
+                  <p className="text-green-700 text-sm mt-1">
+                    Your payment is protected and encrypted
+                  </p>
+                </div>
+
+                <div className="text-sm text-gray-600 space-y-2">
+                  <p>✓ 24-hour delivery start</p>
+                  <p>✓ 30-day retention guarantee</p>
+                  <p>✓ 24/7 customer support</p>
+                  <p>✓ Money-back guarantee</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
