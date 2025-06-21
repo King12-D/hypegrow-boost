@@ -1,23 +1,37 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { Instagram, Youtube, MessageCircle, ShoppingCart, CheckCircle } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useCreateOrder } from '@/hooks/useOrders';
+import { useServicePackages } from '@/hooks/useServicePackages';
+import { useAuth } from '@/hooks/useAuth';
+import { Instagram, Youtube, MessageCircle, ShoppingCart, CheckCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Order = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const createOrder = useCreateOrder();
+  const { data: packages } = useServicePackages();
+
   const [formData, setFormData] = useState({
     platform: searchParams.get('platform') || '',
     service: searchParams.get('service') || '',
     package: searchParams.get('package') || '',
     price: searchParams.get('price') || '',
+    packageId: searchParams.get('packageId') || '',
     username: '',
     postLink: '',
-    quantity: '',
-    email: '',
-    whatsapp: ''
+    notes: ''
   });
 
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
 
   const platforms = [
     { name: 'Instagram', icon: Instagram, color: 'from-pink-500 to-purple-600' },
@@ -26,21 +40,72 @@ const Order = () => {
     { name: 'WhatsApp', icon: MessageCircle, color: 'from-green-500 to-green-600' }
   ];
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  useEffect(() => {
+    if (formData.packageId && packages) {
+      const pkg = packages.find(p => p.id === formData.packageId);
+      if (pkg) {
+        setSelectedPackage(pkg);
+        setFormData(prev => ({
+          ...prev,
+          platform: pkg.platform,
+          service: pkg.service_type,
+          package: pkg.package_name,
+          price: pkg.price.toString()
+        }));
+      }
+    }
+  }, [formData.packageId, packages]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Order submitted:', formData);
-    setOrderPlaced(true);
     
-    // In a real app, you would send this data to your backend
-    // For now, we'll just simulate the order placement
+    if (!selectedPackage) {
+      return;
+    }
+
+    try {
+      const orderData = {
+        platform: selectedPackage.platform,
+        service_type: selectedPackage.service_type,
+        package_name: selectedPackage.package_name,
+        quantity: selectedPackage.quantity,
+        amount: selectedPackage.price,
+        username: formData.username,
+        post_link: formData.postLink || undefined,
+        notes: formData.notes || undefined,
+      };
+
+      const order = await createOrder.mutateAsync(orderData);
+      setOrderPlaced(true);
+      
+      // Redirect to payment after 2 seconds
+      setTimeout(() => {
+        navigate(`/payment?orderId=${order.id}`);
+      }, 2000);
+    } catch (error) {
+      console.error('Order creation failed:', error);
+    }
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Authentication Required</CardTitle>
+            <CardDescription>Please sign in to place an order.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   if (orderPlaced) {
     return (
@@ -52,8 +117,7 @@ const Order = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Order Placed Successfully!</h2>
             <p className="text-gray-600 mb-6">
-              Your order has been received. We'll start processing it within 24 hours. 
-              You'll receive updates on WhatsApp.
+              Your order has been received. Redirecting to payment...
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <h3 className="font-semibold text-gray-900 mb-2">Order Details:</h3>
@@ -61,22 +125,8 @@ const Order = () => {
                 Platform: {formData.platform}<br />
                 Service: {formData.service}<br />
                 Package: {formData.package}<br />
-                Price: {formData.price}
+                Price: ₦{formData.price}
               </p>
-            </div>
-            <div className="space-y-3">
-              <Link
-                to="/payment"
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 block text-center"
-              >
-                Proceed to Payment
-              </Link>
-              <Link
-                to="/services"
-                className="w-full border border-purple-600 text-purple-600 py-3 px-6 rounded-lg font-semibold hover:bg-purple-600 hover:text-white transition-all duration-300 block text-center"
-              >
-                Order More Services
-              </Link>
             </div>
           </div>
         </div>
@@ -98,198 +148,121 @@ const Order = () => {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Platform Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Platform *
-                </label>
-                <select
-                  name="platform"
-                  value={formData.platform}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">Select Platform</option>
-                  {platforms.map((platform) => (
-                    <option key={platform.name} value={platform.name}>
-                      {platform.name}
-                    </option>
-                  ))}
-                </select>
+        <Card>
+          <CardHeader>
+            <CardTitle>Order Details</CardTitle>
+            <CardDescription>
+              Complete your order information below
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Username */}
+                <div>
+                  <Label htmlFor="username">Username/Handle *</Label>
+                  <Input
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    placeholder="@yourusername"
+                    required
+                  />
+                </div>
+
+                {/* Post Link */}
+                <div>
+                  <Label htmlFor="postLink">Post/Video Link</Label>
+                  <Input
+                    id="postLink"
+                    name="postLink"
+                    type="url"
+                    value={formData.postLink}
+                    onChange={handleInputChange}
+                    placeholder="https://..."
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Required for likes, comments, and views
+                  </p>
+                </div>
               </div>
 
-              {/* Service Type */}
+              {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Service Type *
-                </label>
-                <input
-                  type="text"
-                  name="service"
-                  value={formData.service}
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
                   onChange={handleInputChange}
-                  placeholder="e.g., Instagram Followers"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Any special instructions or requirements..."
+                  rows={3}
                 />
               </div>
 
-              {/* Package */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Package *
-                </label>
-                <input
-                  type="text"
-                  name="package"
-                  value={formData.package}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 1000 Followers"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Price */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price
-                </label>
-                <input
-                  type="text"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  placeholder="₦0"
-                  readOnly
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                />
-              </div>
-
-              {/* Username */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Username/Handle *
-                </label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  placeholder="@yourusername"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Post Link */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Post/Video Link
-                </label>
-                <input
-                  type="url"
-                  name="postLink"
-                  value={formData.postLink}
-                  onChange={handleInputChange}
-                  placeholder="https://..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Required for likes, comments, and views
-                </p>
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="your@email.com"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* WhatsApp */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  WhatsApp Number *
-                </label>
-                <input
-                  type="tel"
-                  name="whatsapp"
-                  value={formData.whatsapp}
-                  onChange={handleInputChange}
-                  placeholder="+234 XXX XXX XXXX"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  For order updates and support
-                </p>
-              </div>
-            </div>
-
-            {/* Order Summary */}
-            {formData.service && formData.package && formData.price && (
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <ShoppingCart className="w-5 h-5 mr-2" />
-                  Order Summary
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Platform:</span>
-                    <span className="font-semibold">{formData.platform}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Service:</span>
-                    <span className="font-semibold">{formData.service}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Package:</span>
-                    <span className="font-semibold">{formData.package}</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between text-lg">
-                      <span className="font-semibold">Total:</span>
-                      <span className="font-bold text-purple-600">{formData.price}</span>
+              {/* Order Summary */}
+              {selectedPackage && (
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mt-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Order Summary
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Platform:</span>
+                      <span className="font-semibold">{selectedPackage.platform}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Service:</span>
+                      <span className="font-semibold">{selectedPackage.service_type}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Package:</span>
+                      <span className="font-semibold">{selectedPackage.package_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Quantity:</span>
+                      <span className="font-semibold">{selectedPackage.quantity.toLocaleString()}</span>
+                    </div>
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between text-lg">
+                        <span className="font-semibold">Total:</span>
+                        <span className="font-bold text-purple-600">₦{selectedPackage.price.toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Terms */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2">Terms & Conditions:</h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• Delivery starts within 24 hours of payment confirmation</li>
+                  <li>• Accounts must be public during service delivery</li>
+                  <li>• No refunds after service delivery has started</li>
+                  <li>• We provide 30-day retention guarantee</li>
+                </ul>
               </div>
-            )}
 
-            {/* Terms */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-semibold text-gray-900 mb-2">Terms & Conditions:</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Delivery starts within 24 hours of payment confirmation</li>
-                <li>• Accounts must be public during service delivery</li>
-                <li>• No refunds after service delivery has started</li>
-                <li>• We provide 30-day retention guarantee</li>
-              </ul>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
-            >
-              Place Order
-            </button>
-          </form>
-        </div>
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={createOrder.isPending || !selectedPackage}
+              >
+                {createOrder.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                )}
+                Place Order
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

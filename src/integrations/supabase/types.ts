@@ -9,6 +9,132 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      orders: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          package_name: string
+          payment_status: string
+          platform: string
+          post_link: string | null
+          quantity: number
+          service_type: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          username: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          package_name: string
+          payment_status?: string
+          platform: string
+          post_link?: string | null
+          quantity: number
+          service_type: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          username: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          package_name?: string
+          payment_status?: string
+          platform?: string
+          post_link?: string | null
+          quantity?: number
+          service_type?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          bank_reference: string | null
+          created_at: string
+          id: string
+          order_id: string | null
+          payment_method: string
+          payment_proof_url: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          bank_reference?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          payment_method?: string
+          payment_proof_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_reference?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          payment_method?: string
+          payment_proof_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -36,6 +162,45 @@ export type Database = {
           phone_number?: string | null
           updated_at?: string
           wallet_balance?: number
+        }
+        Relationships: []
+      }
+      service_packages: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          is_popular: boolean | null
+          package_name: string
+          platform: string
+          price: number
+          quantity: number
+          service_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_popular?: boolean | null
+          package_name: string
+          platform: string
+          price: number
+          quantity: number
+          service_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_popular?: boolean | null
+          package_name?: string
+          platform?: string
+          price?: number
+          quantity?: number
+          service_type?: string
+          updated_at?: string
         }
         Relationships: []
       }
