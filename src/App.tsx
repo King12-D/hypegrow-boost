@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import AuthGuard from "@/components/AuthGuard";
+import AdminGuard from "@/components/AdminGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
@@ -66,7 +67,9 @@ const App = () => (
               } />
               <Route path="/admin" element={
                 <AuthGuard requireAuth={true}>
-                  <Layout><Admin /></Layout>
+                  <AdminGuard>
+                    <Layout><Admin /></Layout>
+                  </AdminGuard>
                 </AuthGuard>
               } />
               <Route path="/contact" element={<Layout><Contact /></Layout>} />
