@@ -1,24 +1,31 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { JustAnotherPanelAPI } from '@/services/justAnotherPanelApi';
-import { supabase } from '@/integrations/supabase/client';
 
 export const useJAPServices = () => {
   return useQuery({
     queryKey: ['jap-services'],
     queryFn: async () => {
-      // Get API key from Supabase secrets/environment
-      const apiKey = process.env.REACT_APP_JAP_API_KEY || 
-                     import.meta.env.VITE_JAP_API_KEY;
+      // Get API key from Supabase secrets
+      const response = await fetch('/api/get-jap-key');
+      let apiKey;
+      
+      if (response.ok) {
+        const data = await response.json();
+        apiKey = data.apiKey;
+      } else {
+        // Fallback to environment variables for development
+        apiKey = import.meta.env.VITE_JAP_API_KEY;
+      }
       
       if (!apiKey) {
-        throw new Error('JustAnotherPanel API key not configured');
+        throw new Error('JustAnotherPanel API key not configured. Please add your API key in the project settings.');
       }
 
       const api = new JustAnotherPanelAPI(apiKey);
       const services = await api.getServices();
 
-      // Group services by platform and type
+      // Group services by platform and type for better organization
       const groupedServices = services.reduce((acc, service) => {
         const platform = service.category.split(' - ')[0] || 'Other';
         const serviceType = service.name.includes('Followers') ? 'Followers' :
@@ -40,7 +47,7 @@ export const useJAPServices = () => {
           service_type: serviceType,
           package_name: service.name,
           quantity: parseInt(service.max),
-          price: Math.round(parseFloat(service.rate) * 1000), // Convert to Naira (approximate)
+          price: Math.round(parseFloat(service.rate) * 1000), // Convert to local currency
           min_quantity: parseInt(service.min),
           max_quantity: parseInt(service.max),
           description: service.name,
@@ -56,6 +63,7 @@ export const useJAPServices = () => {
     },
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
     retry: 2,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -63,8 +71,15 @@ export const useJAPBalance = () => {
   return useQuery({
     queryKey: ['jap-balance'],
     queryFn: async () => {
-      const apiKey = process.env.REACT_APP_JAP_API_KEY || 
-                     import.meta.env.VITE_JAP_API_KEY;
+      const response = await fetch('/api/get-jap-key');
+      let apiKey;
+      
+      if (response.ok) {
+        const data = await response.json();
+        apiKey = data.apiKey;
+      } else {
+        apiKey = import.meta.env.VITE_JAP_API_KEY;
+      }
       
       if (!apiKey) {
         throw new Error('JustAnotherPanel API key not configured');

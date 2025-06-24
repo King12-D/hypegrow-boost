@@ -23,8 +23,16 @@ export const useCreateJAPOrder = () => {
     mutationFn: async (orderData: CreateJAPOrderData) => {
       if (!user) throw new Error('User must be authenticated');
 
-      const apiKey = process.env.REACT_APP_JAP_API_KEY || 
-                     import.meta.env.VITE_JAP_API_KEY;
+      // Get API key from Supabase secrets or environment
+      const response = await fetch('/api/get-jap-key');
+      let apiKey;
+      
+      if (response.ok) {
+        const data = await response.json();
+        apiKey = data.apiKey;
+      } else {
+        apiKey = import.meta.env.VITE_JAP_API_KEY;
+      }
       
       if (!apiKey) {
         throw new Error('JustAnotherPanel API key not configured');
@@ -62,15 +70,17 @@ export const useCreateJAPOrder = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['jap-balance'] });
       toast({
         title: "Order Placed Successfully!",
-        description: "Your social media boost order is now being processed.",
+        description: "Your social media boost order is now being processed by real providers.",
       });
     },
     onError: (error) => {
+      console.error('JAP Order Error:', error);
       toast({
         title: "Order Failed",
-        description: error.message,
+        description: error.message || "Failed to place order. Please try again.",
         variant: "destructive",
       });
     },
@@ -81,8 +91,15 @@ export const useJAPOrderStatus = (japOrderId: number) => {
   return useQuery({
     queryKey: ['jap-order-status', japOrderId],
     queryFn: async () => {
-      const apiKey = process.env.REACT_APP_JAP_API_KEY || 
-                     import.meta.env.VITE_JAP_API_KEY;
+      const response = await fetch('/api/get-jap-key');
+      let apiKey;
+      
+      if (response.ok) {
+        const data = await response.json();
+        apiKey = data.apiKey;
+      } else {
+        apiKey = import.meta.env.VITE_JAP_API_KEY;
+      }
       
       if (!apiKey) {
         throw new Error('JustAnotherPanel API key not configured');
