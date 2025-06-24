@@ -18,6 +18,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -63,6 +64,11 @@ const App = () => (
               <Route path="/profile" element={
                 <AuthGuard requireAuth={true}>
                   <Layout><Profile /></Layout>
+                </AuthGuard>
+              } />
+              <Route path="/support" element={
+                <AuthGuard requireAuth={true}>
+                  <Layout><Support /></Layout>
                 </AuthGuard>
               } />
               <Route path="/admin" element={

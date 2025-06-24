@@ -2,16 +2,37 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useServicePackages } from '@/hooks/useServicePackages';
-import { Instagram, Youtube, MessageCircle, Users, Heart, Play, Eye, Share, Clock, Loader2 } from 'lucide-react';
+import { useAnalytics } from '@/hooks/useAnalytics';
+import { 
+  Instagram, 
+  Youtube, 
+  MessageCircle, 
+  Users, 
+  Heart, 
+  Eye, 
+  Share, 
+  Clock, 
+  Loader2,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Camera
+} from 'lucide-react';
 
 const Services = () => {
   const { data: packages, isLoading, error } = useServicePackages();
+  const { track } = useAnalytics();
 
   const platformConfig = {
     'Instagram': { icon: Instagram, color: 'from-pink-500 to-purple-600' },
     'TikTok': { icon: MessageCircle, color: 'from-gray-900 to-gray-700' },
     'YouTube': { icon: Youtube, color: 'from-red-500 to-red-600' },
-    'WhatsApp': { icon: MessageCircle, color: 'from-green-500 to-green-600' }
+    'WhatsApp': { icon: MessageCircle, color: 'from-green-500 to-green-600' },
+    'Facebook': { icon: Facebook, color: 'from-blue-600 to-blue-700' },
+    'Twitter': { icon: Twitter, color: 'from-blue-400 to-blue-500' },
+    'LinkedIn': { icon: Linkedin, color: 'from-blue-700 to-blue-800' },
+    'Snapchat': { icon: Camera, color: 'from-yellow-400 to-yellow-500' },
+    'Telegram': { icon: MessageCircle, color: 'from-blue-500 to-blue-600' }
   };
 
   const serviceIcons = {
@@ -22,7 +43,18 @@ const Services = () => {
     'Subscribers': Users,
     'Watch Hours': Clock,
     'Status Views': Eye,
-    'Bulk Posting': Share
+    'Bulk Posting': Share,
+    'Connections': Users,
+    'Retweets': Share,
+    'Members': Users
+  };
+
+  const handleOrderClick = (platform: string, serviceType: string, packageName: string) => {
+    track('service_order_clicked', {
+      platform,
+      service_type: serviceType,
+      package_name: packageName,
+    });
   };
 
   if (isLoading) {
@@ -66,7 +98,7 @@ const Services = () => {
             </span>
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Choose from our comprehensive range of social media boosting services. 
+            Choose from our comprehensive range of social media boosting services across all major platforms. 
             All packages include high-quality engagement and 24/7 support.
           </p>
         </div>
@@ -120,9 +152,11 @@ const Services = () => {
                                     )}
                                   </div>
                                   <span className="text-2xl font-bold text-purple-600">₦{pkg.price.toLocaleString()}</span>
+                                  <p className="text-sm text-gray-500">{pkg.quantity.toLocaleString()} {serviceType}</p>
                                 </div>
                                 <Link
                                   to={`/order?service=${encodeURIComponent(serviceType)}&package=${encodeURIComponent(pkg.package_name)}&price=${encodeURIComponent(pkg.price)}&platform=${encodeURIComponent(platform)}&packageId=${pkg.id}`}
+                                  onClick={() => handleOrderClick(platform, serviceType, pkg.package_name)}
                                   className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
                                 >
                                   Order Now

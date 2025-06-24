@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Home, Package, ShoppingCart, MessageCircle, User, LogOut, Shield } from 'lucide-react';
+import { Home, Package, ShoppingCart, MessageCircle, User, LogOut, Shield, HelpCircle } from 'lucide-react';
+import NotificationDropdown from '@/components/NotificationDropdown';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,6 +34,7 @@ const Layout = ({ children }: LayoutProps) => {
   const userNavigation = user ? [
     { name: 'Dashboard', href: '/dashboard', icon: ShoppingCart },
     { name: 'Order', href: '/order', icon: Package },
+    { name: 'Support', href: '/support', icon: HelpCircle },
   ] : [];
 
   const getInitials = () => {
@@ -102,6 +105,8 @@ const Layout = ({ children }: LayoutProps) => {
 
             {/* User Menu */}
             <div className="flex items-center space-x-4">
+              {user && <NotificationDropdown />}
+              
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -125,6 +130,10 @@ const Layout = ({ children }: LayoutProps) => {
                     <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                       <ShoppingCart className="mr-2 h-4 w-4" />
                       Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/support')}>
+                      <HelpCircle className="mr-2 h-4 w-4" />
+                      Support
                     </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem onClick={() => navigate('/admin')}>
@@ -202,7 +211,9 @@ const Layout = ({ children }: LayoutProps) => {
                 <li>Instagram Marketing</li>
                 <li>TikTok Growth</li>
                 <li>YouTube Promotion</li>
-                <li>WhatsApp Marketing</li>
+                <li>Facebook Engagement</li>
+                <li>Twitter Growth</li>
+                <li>LinkedIn Marketing</li>
               </ul>
             </div>
             
