@@ -16,6 +16,7 @@ serve(async (req) => {
     const japApiKey = Deno.env.get('JAP_API_KEY')
     
     if (!japApiKey) {
+      console.error('JAP_API_KEY not found in environment')
       return new Response(
         JSON.stringify({ error: 'JAP API key not configured' }),
         { 
@@ -25,8 +26,10 @@ serve(async (req) => {
       )
     }
 
-    const url = new URL(req.url)
-    const action = url.searchParams.get('action') || 'services'
+    const body = await req.json().catch(() => ({}))
+    const action = body.action || 'services'
+
+    console.log('JAP API Request:', { action, body })
 
     // Prepare form data for JustAnotherPanel API
     const formData = new FormData()
@@ -35,14 +38,14 @@ serve(async (req) => {
 
     // Add additional parameters based on action
     if (action === 'add') {
-      const body = await req.json()
       formData.append('service', body.service.toString())
       formData.append('link', body.link)
       formData.append('quantity', body.quantity.toString())
     } else if (action === 'status') {
-      const body = await req.json()
       formData.append('order', body.order.toString())
     }
+
+    console.log('Making request to JAP API with action:', action)
 
     // Make request to JustAnotherPanel API
     const response = await fetch('https://justanotherpanel.com/api/v2', {
@@ -50,11 +53,22 @@ serve(async (req) => {
       body: formData,
     })
 
+    const responseText = await response.text()
+    console.log('JAP API Response:', responseText)
+
     if (!response.ok) {
-      throw new Error(`JAP API request failed: ${response.statusText}`)
+      throw new Error(`JAP API request failed: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json()
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      console.error('Failed to parse JAP response as JSON:', responseText)
+      throw new Error(`Invalid JSON response from JAP API: ${responseText}`)
+    }
+
+    console.log('Parsed JAP data:', data)
 
     return new Response(
       JSON.stringify(data),

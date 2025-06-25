@@ -1,20 +1,14 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { 
-  Instagram, 
-  Youtube, 
-  MessageCircle, 
   Users, 
   Heart, 
   Eye, 
   Share, 
   Clock,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Camera
+  MessageCircle
 } from 'lucide-react';
 
 interface JAPServiceCardProps {
@@ -38,6 +32,7 @@ interface JAPServiceCardProps {
 
 const JAPServiceCard: React.FC<JAPServiceCardProps> = ({ service, platformConfig }) => {
   const { track } = useAnalytics();
+  const navigate = useNavigate();
 
   const serviceIcons = {
     'Followers': Users,
@@ -47,6 +42,7 @@ const JAPServiceCard: React.FC<JAPServiceCardProps> = ({ service, platformConfig
     'Subscribers': Users,
     'Watch Hours': Clock,
     'Retweets': Share,
+    'Shares': Share,
     'Other': Share
   };
 
@@ -59,6 +55,9 @@ const JAPServiceCard: React.FC<JAPServiceCardProps> = ({ service, platformConfig
       package_name: service.package_name,
       jap_service_id: service.jap_service_id,
     });
+
+    // Navigate to order page with JAP service parameters
+    navigate(`/order?japServiceId=${service.jap_service_id}&service=${encodeURIComponent(service.service_type)}&package=${encodeURIComponent(service.package_name)}&price=${encodeURIComponent(service.price)}&platform=${encodeURIComponent(service.platform)}&minQty=${service.min_quantity}&maxQty=${service.max_quantity}&isJAP=true`);
   };
 
   return (
@@ -83,13 +82,12 @@ const JAPServiceCard: React.FC<JAPServiceCardProps> = ({ service, platformConfig
         </div>
       </div>
       
-      <Link
-        to={`/order?serviceId=${service.jap_service_id}&service=${encodeURIComponent(service.service_type)}&package=${encodeURIComponent(service.package_name)}&price=${encodeURIComponent(service.price)}&platform=${encodeURIComponent(service.platform)}&minQty=${service.min_quantity}&maxQty=${service.max_quantity}`}
+      <button
         onClick={handleOrderClick}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-2 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 text-center text-sm block"
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-2 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 text-center text-sm"
       >
-        Order Now
-      </Link>
+        Order Now - Pay via Bank Transfer
+      </button>
     </div>
   );
 };
