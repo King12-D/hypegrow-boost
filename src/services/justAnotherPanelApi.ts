@@ -1,4 +1,6 @@
 
+import { supabase } from '@/integrations/supabase/client';
+
 interface JAPService {
   service: number;
   name: string;
@@ -22,52 +24,60 @@ interface JAPOrderStatus {
 }
 
 class JustAnotherPanelAPI {
-  private baseUrl = 'https://justanotherpanel.com/api/v2';
-  private apiKey: string;
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  private async makeRequest(action: string, params: Record<string, any> = {}) {
-    const formData = new FormData();
-    formData.append('key', this.apiKey);
-    formData.append('action', action);
-    
-    Object.entries(params).forEach(([key, value]) => {
-      formData.append(key, value.toString());
+  async getServices(): Promise<JAPService[]> {
+    const { data, error } = await supabase.functions.invoke('jap-services', {
+      body: { action: 'services' }
     });
 
-    const response = await fetch(this.baseUrl, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+    if (error) {
+      throw new Error(`Failed to fetch services: ${error.message}`);
     }
 
-    return response.json();
-  }
-
-  async getServices(): Promise<JAPService[]> {
-    return this.makeRequest('services');
+    return data;
   }
 
   async createOrder(serviceId: number, link: string, quantity: number): Promise<JAPOrderResponse> {
-    return this.makeRequest('add', {
-      service: serviceId,
-      link,
-      quantity,
+    const { data, error } = await supabase.functions.invoke('jap-services', {
+      body: { 
+        action: 'add',
+        service: serviceId,
+        link,
+        quantity
+      }
     });
+
+    if (error) {
+      throw new Error(`Failed to create order: ${error.message}`);
+    }
+
+    return data;
   }
 
   async getOrderStatus(orderId: number): Promise<JAPOrderStatus> {
-    return this.makeRequest('status', { order: orderId });
+    const { data, error } = await supabase.functions.invoke('jap-services', {
+      body: { 
+        action: 'status',
+        order: orderId
+      }
+    });
+
+    if (error) {
+      throw new Error(`Failed to get order status: ${error.message}`);
+    }
+
+    return data;
   }
 
   async getBalance(): Promise<{ balance: string; currency: string }> {
-    return this.makeRequest('balance');
+    const { data, error } = await supabase.functions.invoke('jap-services', {
+      body: { action: 'balance' }
+    });
+
+    if (error) {
+      throw new Error(`Failed to get balance: ${error.message}`);
+    }
+
+    return data;
   }
 }
 

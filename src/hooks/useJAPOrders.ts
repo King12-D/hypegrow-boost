@@ -23,20 +23,8 @@ export const useCreateJAPOrder = () => {
     mutationFn: async (orderData: CreateJAPOrderData) => {
       if (!user) throw new Error('User must be authenticated');
 
-      // Get API key from Supabase edge function
-      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-jap-key');
-      
-      if (keyError) {
-        console.error('Error fetching JAP API key:', keyError);
-        throw new Error('Failed to fetch API key');
-      }
-
-      if (!keyData?.apiKey) {
-        throw new Error('JustAnotherPanel API key not configured');
-      }
-
       // Create order in JustAnotherPanel
-      const api = new JustAnotherPanelAPI(keyData.apiKey);
+      const api = new JustAnotherPanelAPI();
       const japOrder = await api.createOrder(
         orderData.serviceId,
         orderData.link,
@@ -88,18 +76,7 @@ export const useJAPOrderStatus = (japOrderId: number) => {
   return useQuery({
     queryKey: ['jap-order-status', japOrderId],
     queryFn: async () => {
-      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-jap-key');
-      
-      if (keyError) {
-        console.error('Error fetching JAP API key:', keyError);
-        throw new Error('Failed to fetch API key');
-      }
-
-      if (!keyData?.apiKey) {
-        throw new Error('JustAnotherPanel API key not configured');
-      }
-
-      const api = new JustAnotherPanelAPI(keyData.apiKey);
+      const api = new JustAnotherPanelAPI();
       return api.getOrderStatus(japOrderId);
     },
     enabled: !!japOrderId,

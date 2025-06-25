@@ -1,25 +1,12 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { JustAnotherPanelAPI } from '@/services/justAnotherPanelApi';
-import { supabase } from '@/integrations/supabase/client';
 
 export const useJAPServices = () => {
   return useQuery({
     queryKey: ['jap-services'],
     queryFn: async () => {
-      // Get API key from Supabase edge function
-      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-jap-key');
-      
-      if (keyError) {
-        console.error('Error fetching JAP API key:', keyError);
-        throw new Error('Failed to fetch API key');
-      }
-
-      if (!keyData?.apiKey) {
-        throw new Error('JustAnotherPanel API key not configured. Please add your API key in the project settings.');
-      }
-
-      const api = new JustAnotherPanelAPI(keyData.apiKey);
+      const api = new JustAnotherPanelAPI();
       const services = await api.getServices();
 
       // Group services by platform and type for better organization
@@ -68,18 +55,7 @@ export const useJAPBalance = () => {
   return useQuery({
     queryKey: ['jap-balance'],
     queryFn: async () => {
-      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-jap-key');
-      
-      if (keyError) {
-        console.error('Error fetching JAP API key:', keyError);
-        throw new Error('Failed to fetch API key');
-      }
-
-      if (!keyData?.apiKey) {
-        throw new Error('JustAnotherPanel API key not configured');
-      }
-
-      const api = new JustAnotherPanelAPI(keyData.apiKey);
+      const api = new JustAnotherPanelAPI();
       return api.getBalance();
     },
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
