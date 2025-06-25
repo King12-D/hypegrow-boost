@@ -23,23 +23,20 @@ export const useCreateJAPOrder = () => {
     mutationFn: async (orderData: CreateJAPOrderData) => {
       if (!user) throw new Error('User must be authenticated');
 
-      // Get API key from Supabase secrets or environment
-      const response = await fetch('/api/get-jap-key');
-      let apiKey;
+      // Get API key from Supabase edge function
+      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-jap-key');
       
-      if (response.ok) {
-        const data = await response.json();
-        apiKey = data.apiKey;
-      } else {
-        apiKey = import.meta.env.VITE_JAP_API_KEY;
+      if (keyError) {
+        console.error('Error fetching JAP API key:', keyError);
+        throw new Error('Failed to fetch API key');
       }
-      
-      if (!apiKey) {
+
+      if (!keyData?.apiKey) {
         throw new Error('JustAnotherPanel API key not configured');
       }
 
       // Create order in JustAnotherPanel
-      const api = new JustAnotherPanelAPI(apiKey);
+      const api = new JustAnotherPanelAPI(keyData.apiKey);
       const japOrder = await api.createOrder(
         orderData.serviceId,
         orderData.link,
@@ -91,21 +88,18 @@ export const useJAPOrderStatus = (japOrderId: number) => {
   return useQuery({
     queryKey: ['jap-order-status', japOrderId],
     queryFn: async () => {
-      const response = await fetch('/api/get-jap-key');
-      let apiKey;
+      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-jap-key');
       
-      if (response.ok) {
-        const data = await response.json();
-        apiKey = data.apiKey;
-      } else {
-        apiKey = import.meta.env.VITE_JAP_API_KEY;
+      if (keyError) {
+        console.error('Error fetching JAP API key:', keyError);
+        throw new Error('Failed to fetch API key');
       }
-      
-      if (!apiKey) {
+
+      if (!keyData?.apiKey) {
         throw new Error('JustAnotherPanel API key not configured');
       }
 
-      const api = new JustAnotherPanelAPI(apiKey);
+      const api = new JustAnotherPanelAPI(keyData.apiKey);
       return api.getOrderStatus(japOrderId);
     },
     enabled: !!japOrderId,
