@@ -1,27 +1,27 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCreateJAPOrder } from '@/hooks/useJAPOrders';
 import { useAuth } from '@/hooks/useAuth';
-import { ShoppingCart, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Loader2, AlertCircle, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const Order = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const createJAPOrder = useCreateJAPOrder();
 
   const [formData, setFormData] = useState({
-    serviceId: searchParams.get('serviceId') || '',
+    japServiceId: searchParams.get('japServiceId') || '',
     platform: searchParams.get('platform') || '',
     service: searchParams.get('service') || '',
     package: searchParams.get('package') || '',
-    price: searchParams.get('price') || '',
+    basePrice: parseFloat(searchParams.get('price') || '0'),
     minQty: parseInt(searchParams.get('minQty') || '0'),
     maxQty: parseInt(searchParams.get('maxQty') || '1000'),
     link: '',
@@ -29,7 +29,7 @@ const Order = () => {
     notes: ''
   });
 
-  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -40,42 +40,78 @@ const Order = () => {
   };
 
   const calculatePrice = () => {
-    const basePrice = parseFloat(formData.price) || 0;
-    const ratio = formData.quantity / 1000; // Assuming base price is per 1000
-    return Math.round(basePrice * ratio);
+    // Convert JAP price (in USD cents) to Naira
+    // JAP rates are typically in USD cents, so we need to convert properly
+    const usdPrice = formData.basePrice / 100; // Convert cents to USD
+    const nairaRate = 1600; // 1 USD = 1600 Naira (approximate)
+    const pricePerThousand = usdPrice * nairaRate;
+    
+    // Calculate based on quantity
+    const totalPrice = (pricePerThousand * formData.quantity) / 1000;
+    return Math.max(Math.round(totalPrice), 100); // Minimum 100 Naira
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.serviceId || !formData.link || !formData.quantity) {
+    if (!formData.japServiceId || !formData.link || !formData.quantity) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
       return;
     }
 
     if (formData.quantity < formData.minQty || formData.quantity > formData.maxQty) {
+      toast({
+        title: "Invalid Quantity",
+        description: `Quantity must be between ${formData.minQty.toLocaleString()} and ${formData.maxQty.toLocaleString()}.`,
+        variant: "destructive",
+      });
       return;
     }
 
-    try {
-      const orderData = {
-        serviceId: parseInt(formData.serviceId),
-        link: formData.link,
-        quantity: formData.quantity,
-        packageName: formData.package,
-        platform: formData.platform,
-        serviceType: formData.service,
-        amount: calculatePrice(),
-      };
+    setIsSubmitting(true);
 
-      await createJAPOrder.mutateAsync(orderData);
-      setOrderPlaced(true);
-      
-      // Redirect to dashboard after 3 seconds
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 3000);
+    try {
+      // Create order in database first - this will NOT trigger the JAP service yet
+      const { data: order, error } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user?.id,
+          platform: formData.platform,
+          service_type: formData.service,
+          package_name: formData.package,
+          quantity: formData.quantity,
+          amount: calculatePrice(),
+          username: formData.link.split('/').pop() || '',
+          post_link: formData.link,
+          status: 'pending_payment', // Important: Order waits for payment
+          payment_status: 'pending',
+          notes: `JAP Service ID: ${formData.japServiceId}${formData.notes ? ` | ${formData.notes}` : ''}`,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Order Created",
+        description: "Your order has been created. Please complete payment to start processing.",
+      });
+
+      // Redirect to payment page
+      navigate(`/payment?orderId=${order.id}`);
     } catch (error) {
       console.error('Order creation failed:', error);
+      toast({
+        title: "Order Failed",
+        description: "Failed to create order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,34 +124,6 @@ const Order = () => {
             <CardDescription>Please sign in to place an order.</CardDescription>
           </CardHeader>
         </Card>
-      </div>
-    );
-  }
-
-  if (orderPlaced) {
-    return (
-      <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-        <div className="max-w-md mx-auto text-center">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Order Placed Successfully!</h2>
-            <p className="text-gray-600 mb-6">
-              Your order is now being processed by our real engagement network. You'll see results within minutes!
-            </p>
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-gray-900 mb-2">Order Details:</h3>
-              <p className="text-sm text-gray-600">
-                Platform: {formData.platform}<br />
-                Service: {formData.service}<br />
-                Quantity: {formData.quantity.toLocaleString()}<br />
-                Total: ₦{calculatePrice().toLocaleString()}
-              </p>
-            </div>
-            <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
-          </div>
-        </div>
       </div>
     );
   }
@@ -138,7 +146,7 @@ const Order = () => {
           <CardHeader>
             <CardTitle>Order Configuration</CardTitle>
             <CardDescription>
-              Configure your social media growth order
+              Configure your social media growth order - Payment required before service delivery
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -153,7 +161,7 @@ const Order = () => {
                     type="url"
                     value={formData.link}
                     onChange={handleInputChange}
-                    placeholder="https://instagram.com/username or https://tiktok.com/@username"
+                    placeholder="https://tiktok.com/@username or https://instagram.com/username"
                     required
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -226,6 +234,22 @@ const Order = () => {
                 </div>
               </div>
 
+              {/* Payment Notice */}
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <CreditCard className="w-5 h-5 text-orange-600 mr-2 mt-0.5" />
+                  <div className="text-sm text-orange-800">
+                    <p className="font-semibold mb-1">Payment Required First:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>You must complete payment via bank transfer before service delivery</li>
+                      <li>Service will only start after payment verification</li>
+                      <li>You'll be redirected to payment page after creating this order</li>
+                      <li>Upload payment proof for quick verification</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
               {/* Important Notes */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start">
@@ -235,7 +259,7 @@ const Order = () => {
                     <ul className="list-disc list-inside space-y-1">
                       <li>Ensure your account/post is public</li>
                       <li>Do not change your username during delivery</li>
-                      <li>Results typically start within 5-30 minutes</li>
+                      <li>Results typically start within 5-30 minutes after payment</li>
                       <li>All engagement comes from real, active users</li>
                     </ul>
                   </div>
@@ -247,14 +271,14 @@ const Order = () => {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={createJAPOrder.isPending || !formData.link || !formData.quantity}
+                disabled={isSubmitting || !formData.link || !formData.quantity}
               >
-                {createJAPOrder.isPending ? (
+                {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <ShoppingCart className="w-4 h-4 mr-2" />
                 )}
-                Place Order - ₦{calculatePrice().toLocaleString()}
+                Create Order & Proceed to Payment - ₦{calculatePrice().toLocaleString()}
               </Button>
             </form>
           </CardContent>

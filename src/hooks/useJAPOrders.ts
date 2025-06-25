@@ -1,6 +1,5 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { JustAnotherPanelAPI } from '@/services/justAnotherPanelApi';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -23,49 +22,65 @@ export const useCreateJAPOrder = () => {
     mutationFn: async (orderData: CreateJAPOrderData) => {
       if (!user) throw new Error('User must be authenticated');
 
-      // Create order in JustAnotherPanel
-      const api = new JustAnotherPanelAPI();
-      const japOrder = await api.createOrder(
-        orderData.serviceId,
-        orderData.link,
-        orderData.quantity
-      );
+      // First, check if payment has been verified for this order
+      const { data: order } = await supabase
+        .from('orders')
+        .select('*, payments(*)')
+        .eq('user_id', user.id)
+        .eq('status', 'paid')
+        .single();
 
-      // Store order in our database with JAP order ID
+      if (!order || !order.payments || order.payments.length === 0) {
+        throw new Error('Payment must be completed and verified before service delivery');
+      }
+
+      const verifiedPayment = order.payments.find((p: any) => p.status === 'verified');
+      if (!verifiedPayment) {
+        throw new Error('Payment verification is required before service delivery');
+      }
+
+      // Only now proceed with JAP order creation
+      const { data: japResponse, error: japError } = await supabase.functions.invoke('jap-services', {
+        body: {
+          action: 'add',
+          service: orderData.serviceId,
+          link: orderData.link,
+          quantity: orderData.quantity
+        }
+      });
+
+      if (japError) throw japError;
+
+      if (japResponse.error) {
+        throw new Error(japResponse.error);
+      }
+
+      // Update order with JAP order ID and set to processing
       const { data, error } = await supabase
         .from('orders')
-        .insert({
-          user_id: user.id,
-          platform: orderData.platform,
-          service_type: orderData.serviceType,
-          package_name: orderData.packageName,
-          quantity: orderData.quantity,
-          amount: orderData.amount,
-          username: orderData.link.split('/').pop() || '',
-          post_link: orderData.link,
+        .update({
           status: 'processing',
-          payment_status: 'paid',
-          notes: `JAP Order ID: ${japOrder.order}`,
+          notes: `${order.notes} | JAP Order ID: ${japResponse.order}`,
         })
+        .eq('id', order.id)
         .select()
         .single();
 
       if (error) throw error;
-      return { ...data, jap_order_id: japOrder.order };
+      return { ...data, jap_order_id: japResponse.order };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['jap-balance'] });
       toast({
-        title: "Order Placed Successfully!",
-        description: "Your social media boost order is now being processed by real providers.",
+        title: "Service Started!",
+        description: "Your social media boost is now being processed by real providers.",
       });
     },
     onError: (error) => {
       console.error('JAP Order Error:', error);
       toast({
-        title: "Order Failed",
-        description: error.message || "Failed to place order. Please try again.",
+        title: "Service Error",
+        description: error.message || "Service could not be started. Please ensure payment is verified.",
         variant: "destructive",
       });
     },
@@ -76,8 +91,15 @@ export const useJAPOrderStatus = (japOrderId: number) => {
   return useQuery({
     queryKey: ['jap-order-status', japOrderId],
     queryFn: async () => {
-      const api = new JustAnotherPanelAPI();
-      return api.getOrderStatus(japOrderId);
+      const { data, error } = await supabase.functions.invoke('jap-services', {
+        body: {
+          action: 'status',
+          order: japOrderId
+        }
+      });
+
+      if (error) throw error;
+      return data;
     },
     enabled: !!japOrderId,
     refetchInterval: 30000, // Check status every 30 seconds
