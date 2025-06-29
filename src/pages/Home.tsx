@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Instagram, Youtube, MessageCircle, TrendingUp, Users, Heart, Play, Star } from 'lucide-react';
+import GoogleAd from '@/components/GoogleAd';
 
 const Home = () => {
   const testimonials = [
@@ -105,6 +105,17 @@ const Home = () => {
         </div>
       </section>
 
+      {/* First Ad - After Hero Section */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50">
+        <div className="max-w-4xl mx-auto">
+          <GoogleAd 
+            adSlot="1234567890" 
+            className="text-center"
+            style={{ display: 'block', minHeight: '280px' }}
+          />
+        </div>
+      </section>
+
       {/* Platforms Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
@@ -136,6 +147,17 @@ const Home = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Second Ad - After Platforms Section */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50">
+        <div className="max-w-4xl mx-auto">
+          <GoogleAd 
+            adSlot="0987654321" 
+            className="text-center"
+            style={{ display: 'block', minHeight: '280px' }}
+          />
         </div>
       </section>
 
@@ -199,6 +221,17 @@ const Home = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Third Ad - Before CTA Section */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50">
+        <div className="max-w-4xl mx-auto">
+          <GoogleAd 
+            adSlot="1122334455" 
+            className="text-center"
+            style={{ display: 'block', minHeight: '280px' }}
+          />
         </div>
       </section>
 
