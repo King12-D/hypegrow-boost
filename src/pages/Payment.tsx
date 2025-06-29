@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -68,9 +67,9 @@ const Payment = () => {
   }, [existingPayment]);
 
   const bankDetails = {
-    bank: 'First Bank of Nigeria',
-    accountNumber: '3034567890',
-    accountName: 'HypeGrow Solutions Limited',
+    bank: 'Access Bank',
+    accountNumber: '1929488751',
+    accountName: 'Munachimuso',
     amount: order ? `₦${order.amount.toLocaleString()}` : '₦0'
   };
 
